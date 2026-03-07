@@ -1,0 +1,42 @@
+H:\CANDLE-LAB\run_all_scanners.bat
+
+conda activate TradeSense
+
+
+cd H:\CANDLE-LAB\scanners\pcr_day
+python 01_append_to_pcr_history_STOCKS_AND_INDICES.py
+python 04_scan_pcr_rise_above_point_8_stocks_indices.py
+python 03_check_last_5_pcr.py
+
+
+cd H:\CANDLE-LAB\scanners\engulfing_candle_1
+python 01_bullish_engulfing_exact.py
+python 02_bearish_engulfing_exact.py
+
+
+cd H:\CANDLE-LAB\scanners\green_candle_fourday
+python 01_4day_green_volume_rising_ok.py
+
+
+cd H:\CANDLE-LAB\scanners\grevystone_candle
+python 02_gravestone_doji_in_uptrend.py
+
+
+cd H:\CANDLE-LAB\scanners\morningstar
+python 01_morning_star_scanner.py
+python 02_evening_star_uptrend.py
+
+
+cd H:\CANDLE-LAB\scanners\red_candle_fourday
+python 01_4day_red_volume_rising_ok.py
+
+
+
+
+
+cd H:\CANDLE-LAB\scanners\red_candle_fourday
+python 01_4day_red_volume_rising_ok.py
+
+cd H:\CANDLE-LAB\scanners\grevystone_candle
+ python 02_gravestone_doji_in_uptrend.py
+
