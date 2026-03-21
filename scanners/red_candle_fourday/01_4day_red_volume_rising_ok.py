@@ -26,10 +26,12 @@ FNO_FILE = Path(
 )
 
 OUT_DIR = Path(
-    r"H:\CANDLE-LAB\analysis\equity\signals"
+    r"H:\CANDLE-LAB\analysis\equity\signals\volume"
 )
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+today = datetime.now().strftime("%Y-%m-%d")
+OUT_FILE = OUT_DIR / f"fno_4day_red_volume_rising_{today}.csv"
 # Daily output file
 today = datetime.now().strftime("%Y-%m-%d")
 OUT_FILE = OUT_DIR / f"fno_4day_red_volume_rising_{today}.csv"

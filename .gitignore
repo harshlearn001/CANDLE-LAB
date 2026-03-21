@@ -1,12 +1,21 @@
 # ===============================
-# GENERATED ANALYSIS FILES
+# GENERATED ANALYSIS FILES (ONLY CSV)
 # ===============================
-analysis/
+analysis/**/*.csv
 
 # ===============================
-# CONFIG OUTPUT
+# KEEP FOLDER STRUCTURE
 # ===============================
-config/fno_symbols.csv
+!analysis/
+!analysis/equity/
+!analysis/equity/signals/
+!analysis/equity/last_row/
+
+# ===============================
+# CONFIG OUTPUT (OPTIONAL)
+# ===============================
+# If auto-generated, ignore
+# config/fno_symbols.csv
 
 # ===============================
 # PYTHON CACHE

@@ -20,13 +20,11 @@ from datetime import datetime
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\engulfing")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Save file with today's date
 today = datetime.now().strftime("%Y-%m-%d")
 OUT_FILE = OUT_DIR / f"fno_bearish_engulfing_{today}.csv"
-
 # =================================================
 # PARAMETERS
 # =================================================

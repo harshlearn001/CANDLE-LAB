@@ -12,21 +12,14 @@ from datetime import datetime
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\hammer")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 today = datetime.now().strftime("%Y-%m-%d")
-OUT_FILE = OUT_DIR / f"fno_hammer_reference_{today}.csv"
+OUT_FILE = OUT_DIR / f"fno_hammer_confirmation_{today}.csv"
 
 # =====================================================
-# CHECK CONFIG FILE
-# =====================================================
-if not FNO_FILE.exists():
-    print(f" Missing file: {FNO_FILE}")
-    exit()
-
-# =====================================================
-# LOAD F&O SYMBOL LIST
+# LOAD F&O SYMBOLS
 # =====================================================
 fno_symbols = pd.read_csv(FNO_FILE)
 fno_list = fno_symbols.iloc[:, 0].astype(str).str.strip().tolist()
@@ -34,15 +27,12 @@ fno_list = fno_symbols.iloc[:, 0].astype(str).str.strip().tolist()
 print(f" Loaded {len(fno_list)} F&O symbols")
 
 # =====================================================
-# HAMMER DETECTION ENGINE
+# HAMMER DETECTION
 # =====================================================
 def detect_hammer(df):
 
     df = df.copy()
 
-    # -----------------------------
-    # Basic Candle Structure
-    # -----------------------------
     df['range'] = df['High'] - df['Low']
     df = df[df['range'] > 0]
 
@@ -54,52 +44,21 @@ def detect_hammer(df):
     df['lower_shadow_pct'] = df['lower_shadow'] / df['range']
     df['upper_shadow_pct'] = df['upper_shadow'] / df['range']
 
-    structure_check = (
+    structure = (
         (df['body_pct'] <= 0.30) &
         (df['lower_shadow_pct'] >= 0.60) &
         (df['upper_shadow_pct'] <= 0.10)
     )
 
-    # -----------------------------
-    # TREND CHECK (5 EMA)
-    # -----------------------------
     df['EMA5'] = df['Close'].ewm(span=5, adjust=False).mean()
-    trend_check = df['Close'] < df['EMA5']
+    trend = df['Close'] < df['EMA5']
 
-    # -----------------------------
-    # VOLUME CHECK
-    # -----------------------------
-    if 'Volume' in df.columns:
-        df['vol_avg20'] = df['Volume'].rolling(20).mean()
-        volume_check = df['Volume'] > 1.5 * df['vol_avg20']
-    else:
-        volume_check = False
-
-    # -----------------------------
-    # ATR CHECK
-    # -----------------------------
-    df['prev_close'] = df['Close'].shift(1)
-
-    df['tr1'] = df['High'] - df['Low']
-    df['tr2'] = abs(df['High'] - df['prev_close'])
-    df['tr3'] = abs(df['Low'] - df['prev_close'])
-
-    df['TR'] = df[['tr1','tr2','tr3']].max(axis=1)
-
-    df['ATR14'] = df['TR'].rolling(14).mean()
-
-    atr_check = df['range'] > (0.8 * df['ATR14'])
-
-    # -----------------------------
-    # FINAL HAMMER CONDITION
-    # -----------------------------
-    df['Hammer'] = structure_check & trend_check & (volume_check | atr_check)
+    df['Hammer'] = structure & trend
 
     return df
 
-
 # =====================================================
-# MAIN SCAN LOOP
+# MAIN LOOP
 # =====================================================
 signals = []
 
@@ -112,44 +71,52 @@ for symbol in fno_list:
 
     try:
         df = pd.read_csv(file_path)
-
         df.columns = [c.strip().capitalize() for c in df.columns]
 
         required = {'Date','Open','High','Low','Close'}
         if not required.issubset(df.columns):
             continue
 
-        # Parse date
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values("Date")
 
         df = detect_hammer(df)
 
-        if df.empty:
+        if len(df) < 3:
             continue
 
-        latest = df.iloc[-1]
+        # -----------------------------
+        # Hammer candle (previous)
+        # -----------------------------
+        hammer_candle = df.iloc[-2]
 
-        if latest['Hammer']:
+        # -----------------------------
+        # Confirmation candle (latest)
+        # -----------------------------
+        confirm_candle = df.iloc[-1]
 
-            signals.append({
-                "Symbol": symbol,
-                "Date": latest['Date'],
-                "Open": latest['Open'],
-                "High": latest['High'],
-                "Low": latest['Low'],
-                "Close": latest['Close'],
-                "Volume": latest.get('Volume', None),
-                "Range": latest['range'],
-                "Body_pct": round(latest['body_pct'],3),
-                "LowerShadow_pct": round(latest['lower_shadow_pct'],3)
-            })
+        if hammer_candle['Hammer']:
 
-            print(f" HAMMER → {symbol}")
+            # Confirmation conditions
+            confirm_breakout = confirm_candle['Close'] > hammer_candle['High']
+            bullish = confirm_candle['Close'] > confirm_candle['Open']
+
+            if confirm_breakout and bullish:
+
+                signals.append({
+                    "Symbol": symbol,
+                    "Hammer_Date": hammer_candle['Date'],
+                    "Confirm_Date": confirm_candle['Date'],
+                    "Hammer_Low": hammer_candle['Low'],
+                    "Hammer_High": hammer_candle['High'],
+                    "Confirm_Close": confirm_candle['Close'],
+                    "Strength": round(confirm_candle['Close'] - hammer_candle['High'], 2)
+                })
+
+                print(f" HAMMER + CONFIRMATION → {symbol}")
 
     except Exception as e:
         print(f" Error in {symbol}: {e}")
-
 
 # =====================================================
 # SAVE OUTPUT
@@ -157,12 +124,11 @@ for symbol in fno_list:
 signals_df = pd.DataFrame(signals)
 
 if not signals_df.empty:
-
     signals_df.to_csv(OUT_FILE, index=False)
 
-    print("\n HAMMER SCAN COMPLETED")
+    print("\n HAMMER CONFIRMATION SCAN COMPLETED")
     print(f" Signals found: {len(signals_df)}")
-    print(f" Saved  {OUT_FILE}")
+    print(f" Saved → {OUT_FILE}")
 
 else:
-    print("\n No Hammer signals found today.")
+    print("\n No Hammer + Confirmation signals found.")
