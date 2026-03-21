@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-print("🔥 RSI DIVERGENCE PRO VERSION RUNNING 🔥")
+print("🔥 RSI DIVERGENCE BALANCED VERSION RUNNING 🔥")
 
 from pathlib import Path
 import pandas as pd
@@ -65,7 +65,7 @@ def find_swings(df, window=5):
     return df
 
 # =====================================================
-# DIVERGENCE LOGIC (STRICT FILTERS)
+# DIVERGENCE LOGIC (BALANCED)
 # =====================================================
 def detect_divergence(df):
 
@@ -75,39 +75,34 @@ def detect_divergence(df):
     swing_lows = df.dropna(subset=['swing_low'])
     swing_highs = df.dropna(subset=['swing_high'])
 
-    # ===============================
-    # BULLISH
-    # ===============================
+    # ---------------- BULLISH ----------------
     if len(swing_lows) >= 2:
         prev = swing_lows.iloc[-2]
         curr = swing_lows.iloc[-1]
 
-        # Fresh (last 2 candles ONLY)
-        recent_condition = (len(df) - df.index.get_loc(curr.name)) <= 2
+        is_recent = (len(df) - df.index.get_loc(curr.name)) <= 5
 
         if (
-            recent_condition and
+            is_recent and
             curr['Low'] < prev['Low'] and
             curr['RSI'] > prev['RSI'] and
-            curr['RSI'] < 40 and
+            curr['RSI'] < 45 and
             curr['Close'] > df['EMA50'].iloc[-1]
         ):
             bullish = True
 
-    # ===============================
-    # BEARISH
-    # ===============================
+    # ---------------- BEARISH ----------------
     if len(swing_highs) >= 2:
         prev = swing_highs.iloc[-2]
         curr = swing_highs.iloc[-1]
 
-        recent_condition = (len(df) - df.index.get_loc(curr.name)) <= 2
+        is_recent = (len(df) - df.index.get_loc(curr.name)) <= 5
 
         if (
-            recent_condition and
+            is_recent and
             curr['High'] > prev['High'] and
             curr['RSI'] < prev['RSI'] and
-            curr['RSI'] > 60 and
+            curr['RSI'] > 55 and
             curr['Close'] < df['EMA50'].iloc[-1]
         ):
             bearish = True
@@ -179,9 +174,9 @@ signals_df = pd.DataFrame(signals)
 if not signals_df.empty:
     signals_df.to_csv(OUT_FILE, index=False)
 
-    print("\n🚀 PRO DIVERGENCE SCAN COMPLETED")
+    print("\n🚀 BALANCED DIVERGENCE SCAN COMPLETED")
     print(f" Signals found: {len(signals_df)}")
     print(f" Saved → {OUT_FILE}")
 
 else:
-    print("\n❌ No high-quality divergence found.")
+    print("\n❌ No divergence found (balanced filter).")
