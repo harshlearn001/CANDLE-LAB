@@ -7,7 +7,7 @@ echo ======================================
 call conda activate TradeSense
 
 REM ======================================
-REM SETUP (VERY IMPORTANT FIRST)
+REM SETUP
 REM ======================================
 echo.
 echo [SETUP]
@@ -16,17 +16,15 @@ python 00_build_fno_symbol_list.py
 python 01_extract_last_row_equity.py
 
 REM ======================================
-REM PCR ENGINE
+REM PCR ENGINE (FIXED)
 REM ======================================
 echo.
 echo [PCR ENGINE]
 cd /d H:\CANDLE-LAB\scanners\pcr_day
-python 01_append_to_pcr_history_STOCKS_AND_INDICES.py
-python 04_scan_pcr_rise_above_point_8_stocks_indices.py
-python 03_check_last_5_pcr.py
+python 01_pcr_engine.py
 
 REM ======================================
-REM TREND STRENGTH (ADX 🔥)
+REM ADX
 REM ======================================
 echo.
 echo [ADX]
@@ -38,7 +36,7 @@ REM ENGULFING
 REM ======================================
 echo.
 echo [ENGULFING]
-cd /d H:\CANDLE-LAB\scanners\engulfing_candle_1
+cd /d H:\CANDLE-LAB\scanners\engulfing_candle
 python 01_bullish_engulfing_exact.py
 python 02_bearish_engulfing_exact.py
 
@@ -60,8 +58,8 @@ REM CANDLE PATTERNS
 REM ======================================
 echo.
 echo [GRAVESTONE]
-cd /d H:\CANDLE-LAB\scanners\grevystone_candle
-python 02_gravestone_doji_in_uptrend.py
+cd /d H:\CANDLE-LAB\scanners\gravestone_candle
+python 01_gravestone_doji_in_uptrend.py
 
 echo.
 echo [HAMMER]
@@ -102,13 +100,13 @@ cd /d H:\CANDLE-LAB\scanners\rsi_divergence
 python 02_rsi_divergence_scan.py
 
 REM ======================================
-REM PATTERN CONFIRMATION
+REM MORNING / EVENING (FIXED)
 REM ======================================
 echo.
 echo [MORNING / EVENING STAR]
-cd /d H:\CANDLE-LAB\scanners\morningstar
+cd /d H:\CANDLE-LAB\scanners\morning_evening_star
 python 01_morning_star_scanner.py
-python 02_evening_star_uptrend.py
+python 02_evening_star_scanner.py
 
 echo.
 echo ======================================

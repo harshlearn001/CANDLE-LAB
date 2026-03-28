@@ -3,55 +3,51 @@
 
 from pathlib import Path
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
-# =====================================================
-# PATH SETTINGS
-# =====================================================
+# ==============================
+# PATHS
+# ==============================
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
 OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\rsi")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-today = datetime.now().strftime("%Y-%m-%d")
-OUT_FILE = OUT_DIR / f"fno_rsi_signals_{today}.csv"
+# 👉 timestamp (avoid overwrite)
+now = datetime.now().strftime("%Y-%m-%d")
+OUT_FILE = OUT_DIR / f"fno_rsi_below30_{now}.csv"
 
-# =====================================================
-# LOAD F&O SYMBOLS
-# =====================================================
+# ==============================
+# LOAD SYMBOLS
+# ==============================
 fno_symbols = pd.read_csv(FNO_FILE)
 fno_list = fno_symbols.iloc[:, 0].astype(str).str.strip().tolist()
 
 print(f" Loaded {len(fno_list)} F&O symbols")
 
-# =====================================================
-# RSI CALCULATION
-# =====================================================
+# ==============================
+# RSI FUNCTION
+# ==============================
 def calculate_rsi(df, period=14):
 
-    df = df.copy()
+    delta = df['close'].diff()
 
-    delta = df['Close'].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
 
-    gain = np.where(delta > 0, delta, 0)
-    loss = np.where(delta < 0, -delta, 0)
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
 
-    gain = pd.Series(gain).rolling(period).mean()
-    loss = pd.Series(loss).rolling(period).mean()
-
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-
-    df['RSI'] = rsi
+    rs = avg_gain / avg_loss
+    df['rsi'] = 100 - (100 / (1 + rs))
 
     return df
 
-# =====================================================
+# ==============================
 # MAIN LOOP
-# =====================================================
-signals = []
+# ==============================
+results = []
 
 for symbol in fno_list:
 
@@ -62,61 +58,60 @@ for symbol in fno_list:
 
     try:
         df = pd.read_csv(file_path)
-        df.columns = [c.strip().capitalize() for c in df.columns]
 
-        required = {'Date','Open','High','Low','Close'}
-        if not required.issubset(df.columns):
+        # clean columns
+        df.columns = [c.strip().lower() for c in df.columns]
+
+        if not {'date','close'}.issubset(df.columns):
             continue
 
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']).sort_values("Date")
+        # clean data
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date']).sort_values("date")
 
+        if len(df) < 50:
+            continue
+
+        # calculate RSI
         df = calculate_rsi(df)
-
-        if len(df) < 20:
-            continue
 
         latest = df.iloc[-1]
 
-        # =====================================================
-        # RSI CONDITIONS
-        # =====================================================
-        if latest['RSI'] < 30:
-            signals.append({
+        # ==============================
+        # CONDITION
+        # ==============================
+        if latest['rsi'] < 25:
+
+            results.append({
                 "Symbol": symbol,
-                "Date": latest['Date'],
-                "Close": latest['Close'],
-                "RSI": round(latest['RSI'], 2),
-                "Signal": "OVERSOLD (BUY)"
+                "Date": latest['date'],
+                "Close": latest['close'],
+                "RSI": round(latest['rsi'], 2)
             })
 
-            print(f" RSI < 30 → {symbol}")
-
-        elif latest['RSI'] > 70:
-            signals.append({
-                "Symbol": symbol,
-                "Date": latest['Date'],
-                "Close": latest['Close'],
-                "RSI": round(latest['RSI'], 2),
-                "Signal": "OVERBOUGHT (SELL)"
-            })
-
-            print(f" RSI > 70 → {symbol}")
+            print(f" RSI {latest['rsi']:.2f} → {symbol}")
 
     except Exception as e:
         print(f" Error in {symbol}: {e}")
 
-# =====================================================
-# SAVE OUTPUT
-# =====================================================
-signals_df = pd.DataFrame(signals)
+# ==============================
+# SAVE (ALWAYS SAVE)
+# ==============================
+df_out = pd.DataFrame(results)
 
-if not signals_df.empty:
-    signals_df.to_csv(OUT_FILE, index=False)
+print("\n==============================")
+print(f" Total stocks found: {len(df_out)}")
+print(f" Saving to: {OUT_FILE}")
 
-    print("\n RSI SCAN COMPLETED")
-    print(f" Signals found: {len(signals_df)}")
-    print(f" Saved → {OUT_FILE}")
+# ✅ ALWAYS SAVE FILE
+df_out.to_csv(OUT_FILE, index=False)
 
+print(" File saved successfully")
+
+# ==============================
+# OPTIONAL MESSAGE
+# ==============================
+if df_out.empty:
+    print("⚠️ No RSI < 30 stocks today")
 else:
-    print("\n No RSI signals found.")
+    print(" RSI BELOW 30 SCAN COMPLETED")
