@@ -1,58 +1,178 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from rich import print
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+
 import pandas as pd
-import os
+from pathlib import Path
 from datetime import datetime
 
-print("\nINSIDE BAR SCANNER STARTED\n")
+console = Console()
 
-symbols_file = r"H:\CANDLE-LAB\config\fno_symbols.csv"
-data_dir = r"H:\MarketForge\data\master\Equity_stock_master"
+# =====================================================
+# HEADER
+# =====================================================
+console.print(Panel.fit(
+    "[bold cyan]INSIDE BAR SCANNER[/bold cyan]\n[white]Volatility Compression Engine[/white]",
+    border_style="cyan"
+))
 
-today_date = str(datetime.today().date())
+# =====================================================
+# PATHS
+# =====================================================
+EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
+FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-output_file = rf"H:\CANDLE-LAB\analysis\equity\signals\inside_bar\fno_inside_bar_{today_date}.csv"
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\inside_bar")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Automatically create folder if missing
-os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-symbols = pd.read_csv(symbols_file)["SYMBOL"].tolist()
+# =====================================================
+# LOAD SYMBOLS
+# =====================================================
+symbols = pd.read_csv(FNO_FILE)["SYMBOL"].astype(str).str.strip().tolist()
+console.print(f"\n[cyan]Loaded Symbols:[/cyan] {len(symbols)}")
 
 results = []
+checked = 0
+all_dates = []   # ✅ collect data dates
 
+# =====================================================
+# MAIN LOOP
+# =====================================================
 for symbol in symbols:
 
-    file_path = os.path.join(data_dir, f"{symbol}.csv")
+    file = EQUITY_DIR / f"{symbol}.csv"
 
-    if not os.path.exists(file_path):
+    if not file.exists():
         continue
 
     try:
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file)
+        df.columns = df.columns.str.strip().str.upper()
+
+        if not {"DATE","HIGH","LOW","CLOSE"}.issubset(df.columns):
+            continue
+
+        df["DATE"] = pd.to_datetime(df["DATE"], errors="coerce")
+        df = df.dropna(subset=["DATE"]).sort_values("DATE")
+
+        if len(df) < 5:
+            continue
+
+        # ✅ collect date
+        if not df.empty:
+            all_dates.append(df["DATE"].max())
+
+        checked += 1
+
+        today = df.iloc[-1]
+        prev  = df.iloc[-2]
+
+        # =====================================================
+        # INSIDE BAR CONDITION
+        # =====================================================
+        if today["HIGH"] < prev["HIGH"] and today["LOW"] > prev["LOW"]:
+
+            today_range = today["HIGH"] - today["LOW"]
+            prev_range  = prev["HIGH"] - prev["LOW"]
+
+            if prev_range == 0:
+                continue
+
+            compression = today_range / prev_range
+
+            # TREND
+            df["EMA20"] = df["CLOSE"].ewm(span=20).mean()
+            trend = "UP" if today["CLOSE"] > df["EMA20"].iloc[-1] else "DOWN"
+
+            strength = "STRONG" if compression < 0.5 else "NORMAL"
+
+            results.append({
+                "Symbol": symbol,
+                "Date": today["DATE"].strftime("%Y-%m-%d"),
+                "Close": round(today["CLOSE"], 2),
+                "Compression": round(compression, 2),
+                "Trend": trend,
+                "Strength": strength
+            })
+
     except:
         continue
 
-    if len(df) < 2:
-        continue
+# =====================================================
+# FINAL DATE (FIX)
+# =====================================================
+if all_dates:
+    final_date = max(all_dates).strftime("%Y-%m-%d")
+else:
+    final_date = datetime.now().strftime("%Y-%m-%d")
 
-    today = df.iloc[-1]
-    prev = df.iloc[-2]
+OUT_FILE = OUT_DIR / f"fno_inside_bar_{final_date}.csv"
 
-    if today["HIGH"] < prev["HIGH"] and today["LOW"] > prev["LOW"]:
+console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
 
-        print("INSIDE BAR →", symbol)
+# =====================================================
+# SUMMARY
+# =====================================================
+console.rule("[bold cyan]INSIDE BAR SUMMARY[/bold cyan]")
 
-        results.append({
-            "SYMBOL": symbol,
-            "DATE": today["DATE"],
-            "HIGH": today["HIGH"],
-            "LOW": today["LOW"],
-            "PREV_HIGH": prev["HIGH"],
-            "PREV_LOW": prev["LOW"]
-        })
+console.print(f"[cyan]📊 Total Checked:[/cyan] {checked}")
+console.print(f"[blue]🔥 Signals Found:[/blue] {len(results)}")
 
+# =====================================================
+# OUTPUT
+# =====================================================
 df_out = pd.DataFrame(results)
 
-df_out.to_csv(output_file, index=False)
+if not df_out.empty:
 
-print("\nINSIDE BAR SCAN COMPLETED")
-print("Stocks found:", len(df_out))
-print("Saved →", output_file)
+    df_out = df_out.sort_values("Compression")
+
+    table = Table(title="🔵 INSIDE BAR (BREAKOUT SETUPS)")
+
+    table.add_column("Symbol", justify="center")
+    table.add_column("Date", justify="center")
+    table.add_column("Close", justify="center")
+    table.add_column("Compression", justify="center")
+    table.add_column("Trend", justify="center")
+    table.add_column("Strength", justify="center")
+
+    for _, row in df_out.head(15).iterrows():
+
+        color = "green" if row["Trend"] == "UP" else "red"
+
+        table.add_row(
+            f"[{color}]{row['Symbol']}[/{color}]",
+            row["Date"],
+            str(row["Close"]),
+            str(row["Compression"]),
+            row["Trend"],
+            row["Strength"]
+        )
+
+    console.print(table)
+
+    df_out.to_csv(OUT_FILE, index=False)
+    console.print(f"\n[bold cyan]✔ Saved → {OUT_FILE}[/bold cyan]")
+
+    console.rule("[bold cyan]ACTION LIST[/bold cyan]")
+
+    console.print("\n[green]🟢 Breakout Up Candidates[/green]")
+    for s in df_out[df_out["Trend"]=="UP"]["Symbol"].head(5):
+        console.print(f"  → {s}")
+
+    console.print("\n[red]🔴 Breakdown Candidates[/red]")
+    for s in df_out[df_out["Trend"]=="DOWN"]["Symbol"].head(5):
+        console.print(f"  → {s}")
+
+else:
+    console.print("\n[yellow]⚠ No Inside Bar Found[/yellow]")
+
+# =====================================================
+# FINAL NOTE
+# =====================================================
+console.rule("[bold yellow]NOTE[/bold yellow]")
+console.print("👉 Inside Bar = compression → breakout coming")

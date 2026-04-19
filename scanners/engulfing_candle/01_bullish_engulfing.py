@@ -8,7 +8,6 @@ from rich.panel import Panel
 
 from pathlib import Path
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 console = Console()
@@ -17,8 +16,8 @@ console = Console()
 # HEADER
 # =================================================
 console.print(Panel.fit(
-    "[bold magenta]GRAVESTONE DOJI SCANNER[/bold magenta]\n[cyan]Reversal Exhaustion Engine[/cyan]",
-    border_style="magenta"
+    "[bold green]BULLISH ENGULFING SCANNER[/bold green]\n[cyan]Pure Price Action Engine[/cyan]",
+    border_style="green"
 ))
 
 # =================================================
@@ -27,8 +26,13 @@ console.print(Panel.fit(
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\gravestone")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\engulfing")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# =================================================
+# PARAMETERS
+# =================================================
+MIN_BODY_RATIO = 0.40
 
 # =================================================
 # LOAD SYMBOLS
@@ -53,7 +57,7 @@ for symbol in symbols:
     try:
         df = pd.read_csv(file)
 
-        if df.empty:
+        if len(df) < 2:
             continue
 
         df.columns = df.columns.str.strip().str.upper()
@@ -65,7 +69,7 @@ for symbol in symbols:
         df["DATE"] = pd.to_datetime(df["DATE"], errors="coerce")
         df = df.dropna(subset=["DATE"]).sort_values("DATE")
 
-        if len(df) < 10:
+        if len(df) < 2:
             continue
 
         # ✅ collect latest date
@@ -74,51 +78,38 @@ for symbol in symbols:
 
         checked += 1
 
-        # --------------------------------------------------
-        # UPTREND CHECK
-        # --------------------------------------------------
-        if df.iloc[-3]["CLOSE"] <= df.iloc[-6]["CLOSE"]:
+        prev = df.iloc[-2]
+        curr = df.iloc[-1]
+
+        # BODY RATIO FUNCTION
+        def body_ratio(c):
+            rng = c["HIGH"] - c["LOW"]
+            if rng <= 0:
+                return 0
+            return abs(c["CLOSE"] - c["OPEN"]) / rng
+
+        if body_ratio(prev) < MIN_BODY_RATIO:
             continue
 
-        c = df.iloc[-1]
-
-        o, h, l, cl = c["OPEN"], c["HIGH"], c["LOW"], c["CLOSE"]
-
-        rng = h - l
-        if rng <= 0:
+        if body_ratio(curr) < MIN_BODY_RATIO:
             continue
 
-        body = abs(cl - o)
-        upper = h - max(o, cl)
-        lower = min(o, cl) - l
-
-        body_pct  = body / rng
-        upper_pct = upper / rng
-        lower_pct = lower / rng
-
-        # --------------------------------------------------
-        # RANGE QUALITY
-        # --------------------------------------------------
-        recent_ranges = df.iloc[-10:-1]["HIGH"] - df.iloc[-10:-1]["LOW"]
-        if rng < np.median(recent_ranges):
-            continue
-
-        # --------------------------------------------------
-        # GRAVESTONE LOGIC
-        # --------------------------------------------------
+        # ENGULFING CONDITION
         if (
-            body_pct <= 0.20 and
-            upper_pct >= 0.50 and
-            lower_pct <= 0.20
+            prev["CLOSE"] < prev["OPEN"] and
+            curr["CLOSE"] > curr["OPEN"] and
+            curr["OPEN"]  < prev["CLOSE"] and
+            curr["CLOSE"] > prev["OPEN"]
         ):
 
-            strength = "STRONG" if upper_pct >= 0.65 else "NORMAL"
+            body_size = abs(curr["CLOSE"] - curr["OPEN"])
+            prev_body = abs(prev["CLOSE"] - prev["OPEN"])
+            strength = "STRONG" if body_size > prev_body else "NORMAL"
 
             results.append({
                 "Symbol": symbol,
-                "Date": c["DATE"].strftime("%Y-%m-%d"),
-                "Close": round(cl, 2),
-                "UpperWick%": round(upper_pct * 100, 2),
+                "Date": curr["DATE"].strftime("%Y-%m-%d"),
+                "Close": round(curr["CLOSE"], 2),
                 "Strength": strength
             })
 
@@ -133,17 +124,17 @@ if all_dates:
 else:
     final_date = datetime.now().strftime("%Y-%m-%d")
 
-OUT_FILE = OUT_DIR / f"gravestone_doji_uptrend_{final_date}.csv"
+OUT_FILE = OUT_DIR / f"bullish_engulfing_{final_date}.csv"
 
 console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
 
 # =================================================
 # SUMMARY
 # =================================================
-console.rule("[bold cyan]GRAVESTONE SUMMARY[/bold cyan]")
+console.rule("[bold cyan]ENGULFING SUMMARY[/bold cyan]")
 
 console.print(f"[cyan]📊 Total Checked:[/cyan] {checked}")
-console.print(f"[magenta]🔥 Signals Found:[/magenta] {len(results)}")
+console.print(f"[green]🔥 Signals Found:[/green] {len(results)}")
 
 # =================================================
 # OUTPUT
@@ -152,44 +143,42 @@ df_out = pd.DataFrame(results)
 
 if not df_out.empty:
 
-    df_out = df_out.sort_values("UpperWick%", ascending=False).reset_index(drop=True)
+    df_out = df_out.sort_values("Date", ascending=False).reset_index(drop=True)
 
-    table = Table(title="🟣 GRAVESTONE DOJI (UPTREND)")
+    table = Table(title="🟢 BULLISH ENGULFING")
 
     table.add_column("Symbol", justify="center")
     table.add_column("Date", justify="center")
     table.add_column("Close", justify="center")
-    table.add_column("UpperWick%", justify="center")
     table.add_column("Strength", justify="center")
 
     for _, row in df_out.head(15).iterrows():
 
-        color = "magenta" if row["Strength"] == "STRONG" else "yellow"
+        color = "green" if row["Strength"] == "STRONG" else "yellow"
 
         table.add_row(
             f"[{color}]{row['Symbol']}[/{color}]",
             f"[{color}]{row['Date']}[/{color}]",
             f"[{color}]{row['Close']}[/{color}]",
-            f"[{color}]{row['UpperWick%']}[/{color}]",
             f"[{color}]{row['Strength']}[/{color}]"
         )
 
     console.print(table)
 
     df_out.to_csv(OUT_FILE, index=False)
-    console.print(f"\n[bold magenta]✔ Saved → {OUT_FILE}[/bold magenta]")
+    console.print(f"\n[bold green]✔ Saved → {OUT_FILE}[/bold green]")
 
-    console.rule("[bold red]ACTION LIST[/bold red]")
+    console.rule("[bold green]ACTION LIST[/bold green]")
 
-    console.print("\n[red]🔴 Potential Reversal Shorts[/red]")
+    console.print("\n[green]🟢 Candidates[/green]")
     for s in df_out["Symbol"].head(5):
         console.print(f"  → {s}")
 
 else:
-    console.print("\n[green]✔ No Gravestone Doji Found[/green]")
+    console.print("\n[red]❌ No Bullish Engulfing Found[/red]")
 
 # =================================================
 # FINAL NOTE
 # =================================================
 console.rule("[bold yellow]NOTE[/bold yellow]")
-console.print("👉 Works best near resistance zones")
+console.print("👉 Use with RSI / ADX for confirmation")

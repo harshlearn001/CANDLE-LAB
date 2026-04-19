@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-CANDLE-LAB | STEP-6 (PRO)
+CANDLE-LAB | STEP-5 (PRO)
 
 ✔ 4 RED candles
-✔ Volume confirmation
-✔ Breakdown continuation scanner
+✔ Rising volume
+✔ Momentum breakdown scanner
 ✔ Data-driven date system (FIXED)
 """
 
@@ -17,10 +17,10 @@ from datetime import datetime
 # =====================================================
 # HEADER UI
 # =====================================================
-print("╭─────────────────────────────────╮")
-print("│ 4-DAY RED + VOLUME CONFIRMED   │")
-print("│ Breakdown Continuation Engine  │")
-print("╰─────────────────────────────────╯\n")
+print("╭──────────────────────────────╮")
+print("│ 4-DAY RED + RISING VOLUME   │")
+print("│ Breakdown Momentum Engine   │")
+print("╰──────────────────────────────╯\n")
 
 # =====================================================
 # PATHS
@@ -28,7 +28,7 @@ print("╰───────────────────────�
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\red_candle")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\volume")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # =====================================================
@@ -38,8 +38,10 @@ if not FNO_FILE.exists():
     print(f"❌ Missing file: {FNO_FILE}")
     exit()
 
+fno_df = pd.read_csv(FNO_FILE)
+
 fno_symbols = set(
-    pd.read_csv(FNO_FILE)["SYMBOL"]
+    fno_df["SYMBOL"]
     .astype(str)
     .str.strip()
     .str.upper()
@@ -73,6 +75,7 @@ for symbol in sorted(fno_symbols):
         if not required.issubset(df.columns):
             continue
 
+        # DATE PARSE
         df["DATE"] = pd.to_datetime(df["DATE"], errors="coerce")
         df = df.dropna(subset=["DATE"]).sort_values("DATE")
 
@@ -93,23 +96,22 @@ for symbol in sorted(fno_symbols):
             continue
 
         # ============================
-        # VOLUME CONFIRMATION
+        # RISING VOLUME
         # ============================
         vols = last4["TOTTRDQTY"].values
-        avg_prev_3 = vols[:3].mean()
 
-        if vols[3] <= avg_prev_3:
+        if not (vols[0] < vols[1] < vols[2] < vols[3]):
             continue
 
         # ============================
-        # STRENGTH
+        # STRENGTH CALCULATION
         # ============================
         last4["BODY"] = last4["OPEN"] - last4["CLOSE"]
 
         total_body = last4["BODY"].sum()
-        vol_ratio = vols[3] / avg_prev_3
+        vol_ratio = vols[3] / vols[:3].mean()
 
-        if vol_ratio > 2:
+        if vol_ratio > 1.8:
             strength = "STRONG"
         elif vol_ratio > 1.3:
             strength = "NORMAL"
@@ -138,7 +140,7 @@ if all_dates:
 else:
     final_date = datetime.now().strftime("%Y-%m-%d")
 
-OUT_FILE = OUT_DIR / f"fno_4day_red_volume_confirmed_{final_date}.csv"
+OUT_FILE = OUT_DIR / f"fno_4day_red_volume_rising_{final_date}.csv"
 
 print(f"\n📅 Data Date Used: {final_date}")
 
@@ -157,7 +159,7 @@ if not df_out.empty:
 
     df_out = df_out.sort_values("Momentum", ascending=False)
 
-    print("\n🔴 4-DAY RED + VOLUME CONFIRMED")
+    print("\n🔴 4-DAY RED + VOLUME")
     print(df_out.head(10))
 
     df_out.to_csv(OUT_FILE, index=False)
@@ -168,7 +170,7 @@ if not df_out.empty:
     print("─"*110)
     print("🎯 ACTION LIST\n")
 
-    print("🔴 Breakdown Short Candidates")
+    print("🔴 Breakdown Candidates")
     for s in df_out.head(5)["Symbol"]:
         print(f"  → {s}")
 
@@ -177,14 +179,14 @@ if not df_out.empty:
     print("🧠 TRADING INSIGHT")
 
     if len(df_out) > 10:
-        print("💀 Strong market-wide selling")
-        print("👉 Favor SHORT strategies")
+        print("💀 Strong selling pressure in market")
+        print("👉 Favor SHORT setups")
     elif len(df_out) > 0:
         print("⚠ Selective breakdowns")
         print("👉 Stock-specific shorts only")
     else:
         print("🚫 No selling pressure")
-        print("👉 Avoid shorts / look for bounce")
+        print("👉 Avoid shorts")
 
 else:
     print("\n❌ No Breakdown Setup Found")

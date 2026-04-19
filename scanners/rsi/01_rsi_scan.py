@@ -1,34 +1,45 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+CANDLE-LAB | RSI OVERSOLD ENGINE (PRO)
+
+✔ RSI < 25 (deep oversold)
+✔ Data-driven date system (FIXED)
+✔ Strength classification
+✔ Clean terminal UI
+"""
+
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
 
-# ==============================
+# =====================================================
+# HEADER UI
+# =====================================================
+print("╭──────────────────────────────╮")
+print("│ RSI OVERSOLD SCANNER        │")
+print("│ Mean Reversion Engine       │")
+print("╰──────────────────────────────╯\n")
+
+# =====================================================
 # PATHS
-# ==============================
+# =====================================================
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
 OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\rsi")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# 👉 timestamp (avoid overwrite)
-now = datetime.now().strftime("%Y-%m-%d")
-OUT_FILE = OUT_DIR / f"fno_rsi_below30_{now}.csv"
-
-# ==============================
+# =====================================================
 # LOAD SYMBOLS
-# ==============================
-fno_symbols = pd.read_csv(FNO_FILE)
-fno_list = fno_symbols.iloc[:, 0].astype(str).str.strip().tolist()
+# =====================================================
+symbols = pd.read_csv(FNO_FILE).iloc[:, 0].astype(str).str.strip().tolist()
+print(f"Loaded Symbols: {len(symbols)}")
 
-print(f" Loaded {len(fno_list)} F&O symbols")
-
-# ==============================
+# =====================================================
 # RSI FUNCTION
-# ==============================
+# =====================================================
 def calculate_rsi(df, period=14):
 
     delta = df['close'].diff()
@@ -44,12 +55,14 @@ def calculate_rsi(df, period=14):
 
     return df
 
-# ==============================
+# =====================================================
 # MAIN LOOP
-# ==============================
+# =====================================================
 results = []
+checked = 0
+all_dates = []   # ✅ collect data dates
 
-for symbol in fno_list:
+for symbol in symbols:
 
     file_path = EQUITY_DIR / f"{symbol}.csv"
 
@@ -59,59 +72,109 @@ for symbol in fno_list:
     try:
         df = pd.read_csv(file_path)
 
-        # clean columns
         df.columns = [c.strip().lower() for c in df.columns]
 
         if not {'date','close'}.issubset(df.columns):
             continue
 
-        # clean data
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df = df.dropna(subset=['date']).sort_values("date")
 
         if len(df) < 50:
             continue
 
-        # calculate RSI
+        # ✅ collect latest date
+        if not df.empty:
+            all_dates.append(df["date"].max())
+
+        checked += 1
+
         df = calculate_rsi(df)
 
         latest = df.iloc[-1]
+        rsi = latest['rsi']
 
-        # ==============================
-        # CONDITION
-        # ==============================
-        if latest['rsi'] < 25:
+        # =====================================================
+        # SIGNAL
+        # =====================================================
+        if rsi < 25:
+
+            if rsi < 15:
+                strength = "EXTREME"
+            elif rsi < 20:
+                strength = "STRONG"
+            else:
+                strength = "NORMAL"
 
             results.append({
                 "Symbol": symbol,
-                "Date": latest['date'],
+                "Date": latest['date'].strftime("%Y-%m-%d"),
                 "Close": latest['close'],
-                "RSI": round(latest['rsi'], 2)
+                "RSI": round(rsi, 2),
+                "Strength": strength
             })
 
-            print(f" RSI {latest['rsi']:.2f} → {symbol}")
+            print(f" {symbol:12} → RSI {rsi:.2f}")
 
     except Exception as e:
-        print(f" Error in {symbol}: {e}")
+        print(f" ERROR → {symbol} | {e}")
 
-# ==============================
-# SAVE (ALWAYS SAVE)
-# ==============================
+# =====================================================
+# FINAL DATE (FIX)
+# =====================================================
+if all_dates:
+    final_date = max(all_dates).strftime("%Y-%m-%d")
+else:
+    final_date = datetime.now().strftime("%Y-%m-%d")
+
+OUT_FILE = OUT_DIR / f"fno_rsi_below25_{final_date}.csv"
+
+print(f"\n📅 Data Date Used: {final_date}")
+
+# =====================================================
+# OUTPUT
+# =====================================================
 df_out = pd.DataFrame(results)
 
-print("\n==============================")
-print(f" Total stocks found: {len(df_out)}")
-print(f" Saving to: {OUT_FILE}")
+print("\n" + "─"*110)
+print("📊 RSI SUMMARY")
+print("─"*110)
+print(f"📊 Total Checked: {checked}")
+print(f"🔥 Signals Found: {len(df_out)}")
 
-# ✅ ALWAYS SAVE FILE
-df_out.to_csv(OUT_FILE, index=False)
+if not df_out.empty:
 
-print(" File saved successfully")
+    df_out = df_out.sort_values("RSI")
 
-# ==============================
-# OPTIONAL MESSAGE
-# ==============================
-if df_out.empty:
-    print("⚠️ No RSI < 30 stocks today")
+    print("\n🟢 RSI < 25 (OVERSOLD)")
+    print(df_out.head(10))
+
+    df_out.to_csv(OUT_FILE, index=False)
+
+    print(f"\n✔ Saved → {OUT_FILE}")
+
+    # ACTION LIST
+    print("─"*110)
+    print("🎯 ACTION LIST\n")
+
+    print("🟢 Mean Reversion Buy Watchlist")
+    for s in df_out.head(5)["Symbol"]:
+        print(f"  → {s}")
+
+    # MARKET INSIGHT
+    print("─"*110)
+    print("🧠 TRADING INSIGHT")
+
+    if len(df_out) > 15:
+        print("🔥 Market deeply oversold")
+        print("👉 Bounce / reversal likely")
+    elif len(df_out) > 5:
+        print("⚠ Selective oversold stocks")
+        print("👉 Watch for reversal setups")
+    else:
+        print("🚫 No strong oversold condition")
+
 else:
-    print(" RSI BELOW 30 SCAN COMPLETED")
+    print("\n❌ No RSI < 25 stocks found")
+
+print("─"*110)

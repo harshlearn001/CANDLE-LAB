@@ -2,91 +2,100 @@
 # -*- coding: utf-8 -*-
 
 """
-CANDLE-LAB | STEP-0
-Build F&O Symbol Master from NSE Futures (FUTSTK)
+CANDLE-LAB | STEP-0 FINAL (FIXED FOR NSE FUT DATA)
 
-✔ NSE source of truth
-✔ Deduplicated
-✔ Reusable across scanners
-✔ Safe & deterministic
+✔ Uses TRADE_DATE column
+✔ Filters only ACTIVE symbols
+✔ No external CSV needed
+✔ Fully compatible with your data
 """
 
 from pathlib import Path
 import pandas as pd
+from datetime import datetime, timedelta
 
 # =================================================
 # PATHS
 # =================================================
-FUT_DIR = Path(
-    r"H:\MarketForge\data\master\Futures_master\FUTSTK"
-)
+FUT_DIR = Path(r"H:\MarketForge\data\master\Futures_master\FUTSTK")
 
-OUT_DIR = Path(
-    r"H:\CANDLE-LAB\config"
-)
+OUT_DIR = Path(r"H:\CANDLE-LAB\config")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 OUT_FILE = OUT_DIR / "fno_symbols.csv"
 
 # =================================================
-# CHECK SOURCE DIRECTORY
+# SETTINGS
 # =================================================
-if not FUT_DIR.exists():
-    print(f" FUTSTK directory not found → {FUT_DIR}")
-    exit()
+CUTOFF_DAYS = 10   # adjust if needed
+MIN_ROWS = 20
 
 # =================================================
-# PROCESS
+# LOAD FILES
 # =================================================
-symbols = set()
+csv_files = list(FUT_DIR.glob("*.csv"))
 
-csv_files = sorted(FUT_DIR.glob("*.csv"))
-print(f" FUTSTK files found: {len(csv_files)}")
+print(f"📁 FUTSTK files found: {len(csv_files)}")
 
 if not csv_files:
-    print(" No FUTSTK CSV files found")
+    print("❌ No files found")
     exit()
 
-for file in csv_files:
+# =================================================
+# STEP-1: RAW SYMBOLS
+# =================================================
+raw_symbols = [f.stem.upper() for f in csv_files]
+print(f"🔍 Raw symbols extracted: {len(raw_symbols)}")
 
+# =================================================
+# STEP-2: FILTER USING TRADE_DATE
+# =================================================
+cutoff_date = datetime.now() - timedelta(days=CUTOFF_DAYS)
+
+filtered_symbols = []
+
+for file in csv_files:
     try:
         df = pd.read_csv(file)
 
-        if "SYMBOL" not in df.columns:
-            print(f"SKIPPED (NO SYMBOL COLUMN) → {file.name}")
+        # must have TRADE_DATE
+        if "TRADE_DATE" not in df.columns:
             continue
 
-        syms = (
-            df["SYMBOL"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .str.upper()
-        )
+        # convert date
+        df["TRADE_DATE"] = pd.to_datetime(df["TRADE_DATE"], format="%Y%m%d", errors="coerce")
 
-        # remove invalid entries
-        syms = syms[syms != "NAN"]
+        last_date = df["TRADE_DATE"].max()
 
-        symbols.update(syms)
+        if pd.notna(last_date) and last_date >= cutoff_date and len(df) >= MIN_ROWS:
+            filtered_symbols.append(file.stem.upper())
 
     except Exception as e:
-        print(f" ERROR  {file.name} | {e}")
+        print(f"⚠ Skipped {file.name} | {e}")
+
+# remove duplicates
+filtered_symbols = sorted(set(filtered_symbols))
+
+print(f"✅ Active F&O symbols (filtered): {len(filtered_symbols)}")
+
+# =================================================
+# STEP-3: REMOVE INDEX (OPTIONAL)
+# =================================================
+EXCLUDE = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
+
+filtered_symbols = [s for s in filtered_symbols if s not in EXCLUDE]
 
 # =================================================
 # SAVE
 # =================================================
-if symbols:
+if filtered_symbols:
 
-    out_df = pd.DataFrame(
-        sorted(symbols),
-        columns=["SYMBOL"]
-    )
+    df_out = pd.DataFrame(filtered_symbols, columns=["SYMBOL"])
+    df_out.to_csv(OUT_FILE, index=False)
 
-    out_df.to_csv(OUT_FILE, index=False)
-
-    print("\n F&O SYMBOL MASTER BUILT")
-    print(f" Total F&O symbols : {len(out_df)}")
-    print(f" Saved → {OUT_FILE}")
+    print("\n🎯 F&O SYMBOL MASTER BUILT (FINAL CLEAN)")
+    print(f"📊 Total Symbols : {len(df_out)}")
+    print(f"💾 Saved → {OUT_FILE}")
 
 else:
-    print("\n No F&O symbols found")
+    print("❌ No valid symbols after filtering")

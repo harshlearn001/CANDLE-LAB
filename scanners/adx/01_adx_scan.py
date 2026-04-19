@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-print("🔥 ADX SCANNER RUNNING 🔥")
+from rich import print
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+
+console = Console()
+
+# =====================================================
+# HEADER
+# =====================================================
+console.print(Panel.fit(
+    "[bold green]ADX SCANNER[/bold green]\n[cyan]Trend Strength Engine[/cyan]",
+    border_style="green"
+))
 
 # =====================================================
 # PATHS
@@ -17,16 +30,14 @@ FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\adx")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-today = datetime.now().strftime("%Y-%m-%d")
-OUT_FILE = OUT_DIR / f"fno_adx_signals_{today}.csv"
-
 # =====================================================
 # LOAD SYMBOLS
 # =====================================================
 symbols = pd.read_csv(FNO_FILE).iloc[:, 0].astype(str).str.strip().tolist()
-print(f" Loaded {len(symbols)} symbols")
+console.print(f"\n[cyan]Loaded Symbols:[/cyan] {len(symbols)}")
 
 signals = []
+all_dates = []   # ✅ NEW: collect all data dates
 
 # =====================================================
 # ADX CALCULATION
@@ -68,6 +79,11 @@ def calculate_adx(df, period=14):
 # =====================================================
 # MAIN LOOP
 # =====================================================
+uptrend_count = 0
+downtrend_count = 0
+weak_count = 0
+checked = 0
+
 for symbol in symbols:
 
     file_path = EQUITY_DIR / f"{symbol}.csv"
@@ -88,6 +104,12 @@ for symbol in symbols:
         if len(df) < 50:
             continue
 
+        # ✅ COLLECT DATA DATE
+        if not df.empty:
+            all_dates.append(df["Date"].max())
+
+        checked += 1
+
         df = calculate_adx(df)
 
         latest = df.iloc[-1]
@@ -96,47 +118,78 @@ for symbol in symbols:
         plus_di = latest['+DI']
         minus_di = latest['-DI']
 
-        # =====================================================
-        # SIGNAL LOGIC
-        # =====================================================
         signal = None
 
         if adx < 20:
-            signal = "WEAK TREND (REVERSAL ZONE)"
+            signal = "WEAK"
+            weak_count += 1
 
         elif adx > 25:
             if plus_di > minus_di:
-                signal = "STRONG UPTREND"
+                signal = "UPTREND"
+                uptrend_count += 1
             elif minus_di > plus_di:
-                signal = "STRONG DOWNTREND"
+                signal = "DOWNTREND"
+                downtrend_count += 1
 
         if signal:
             signals.append({
                 "Symbol": symbol,
-                "Date": latest['Date'],
-                "Close": latest['Close'],
+                "Close": round(latest['Close'], 2),
                 "ADX": round(adx, 2),
                 "+DI": round(plus_di, 2),
                 "-DI": round(minus_di, 2),
                 "Signal": signal
             })
 
-            print(f" {symbol} → {signal}")
-
-    except Exception as e:
-        print(f" Error in {symbol}: {e}")
+    except:
+        continue
 
 # =====================================================
-# SAVE OUTPUT
+# FINAL DATE (IMPORTANT FIX)
+# =====================================================
+if all_dates:
+    final_date = max(all_dates).strftime("%Y-%m-%d")
+else:
+    final_date = datetime.now().strftime("%Y-%m-%d")
+
+OUT_FILE = OUT_DIR / f"fno_adx_signals_{final_date}.csv"
+
+console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
+
+# =====================================================
+# SUMMARY
+# =====================================================
+console.rule("[bold cyan]ADX SUMMARY[/bold cyan]")
+
+console.print(f"[green]🔥 Uptrend:[/green] {uptrend_count}")
+console.print(f"[red]💀 Downtrend:[/red] {downtrend_count}")
+console.print(f"[yellow]⚠ Weak Trend:[/yellow] {weak_count}")
+console.print(f"[cyan]📊 Total Checked:[/cyan] {checked}")
+
+# =====================================================
+# MARKET STRUCTURE %
+# =====================================================
+total = uptrend_count + downtrend_count + weak_count
+
+if total > 0:
+    up_pct = (uptrend_count / total) * 100
+    down_pct = (downtrend_count / total) * 100
+    weak_pct = (weak_count / total) * 100
+
+    console.print(f"\n[bold]📊 Market Structure:[/bold]")
+    console.print(f"[green]Uptrend: {up_pct:.1f}%[/green]")
+    console.print(f"[red]Downtrend: {down_pct:.1f}%[/red]")
+    console.print(f"[yellow]Weak: {weak_pct:.1f}%[/yellow]")
+
+# =====================================================
+# DATAFRAME
 # =====================================================
 signals_df = pd.DataFrame(signals)
 
 if not signals_df.empty:
+
+    signals_df = signals_df.sort_values("ADX", ascending=False)
+
     signals_df.to_csv(OUT_FILE, index=False)
-
-    print("\n🚀 ADX SCAN COMPLETED")
-    print(f" Signals found: {len(signals_df)}")
-    print(f" Saved → {OUT_FILE}")
-
-else:
-    print("\n❌ No ADX signals found.")
+    console.print(f"\n[bold green]✔ Saved → {OUT_FILE}[/bold green]")

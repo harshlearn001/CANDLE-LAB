@@ -16,8 +16,8 @@ console = Console()
 # HEADER
 # =====================================================
 console.print(Panel.fit(
-    "[bold red]EVENING STAR SCANNER[/bold red]\n[white]Top Reversal Exhaustion Engine[/white]",
-    border_style="red"
+    "[bold magenta]NR7 SCANNER[/bold magenta]\n[white]Volatility Contraction Engine[/white]",
+    border_style="magenta"
 ))
 
 # =====================================================
@@ -26,25 +26,13 @@ console.print(Panel.fit(
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\evening_star")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\nr7")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # =====================================================
 # LOAD SYMBOLS
 # =====================================================
-fno = pd.read_csv(FNO_FILE)
-
-symbol_col = None
-for col in ["Symbol","symbol","SYMBOL","tradingsymbol"]:
-    if col in fno.columns:
-        symbol_col = col
-        break
-
-if symbol_col is None:
-    raise ValueError(f"No symbol column found: {fno.columns}")
-
-symbols = fno[symbol_col].dropna().astype(str).str.strip().unique()
-
+symbols = pd.read_csv(FNO_FILE)["SYMBOL"].astype(str).str.strip().tolist()
 console.print(f"\n[cyan]Loaded Symbols:[/cyan] {len(symbols)}")
 
 results = []
@@ -63,16 +51,15 @@ for sym in symbols:
 
     try:
         df = pd.read_csv(file)
-
         df.columns = df.columns.str.strip().str.upper()
 
-        if not {"DATE","OPEN","HIGH","LOW","CLOSE"}.issubset(df.columns):
+        if not {"DATE","HIGH","LOW","CLOSE"}.issubset(df.columns):
             continue
 
         df["DATE"] = pd.to_datetime(df["DATE"], errors="coerce")
         df = df.dropna(subset=["DATE"]).sort_values("DATE")
 
-        if len(df) < 5:
+        if len(df) < 30:
             continue
 
         # ✅ collect date
@@ -81,33 +68,46 @@ for sym in symbols:
 
         checked += 1
 
-        c1, c2, c3 = df.iloc[-3], df.iloc[-2], df.iloc[-1]
+        if "TOTTRDQTY" not in df.columns:
+            df["TOTTRDQTY"] = 0
 
         # =====================================================
-        # EVENING STAR LOGIC
+        # CALCULATIONS
         # =====================================================
-        cond1 = c1["CLOSE"] > c1["OPEN"]
+        df["RANGE"] = df["HIGH"] - df["LOW"]
+        df["MA20"] = df["CLOSE"].rolling(20).mean()
+        df["VOL_AVG"] = df["TOTTRDQTY"].rolling(20).mean()
 
-        body2 = abs(c2["CLOSE"] - c2["OPEN"])
-        range2 = c2["HIGH"] - c2["LOW"]
-        cond2 = range2 > 0 and body2 < (0.3 * range2)
+        df = df.dropna()
 
-        cond3 = (
-            c3["CLOSE"] < c3["OPEN"] and
-            c3["CLOSE"] < (c1["OPEN"] + c1["CLOSE"]) / 2
-        )
+        if len(df) < 7:
+            continue
 
-        if cond1 and cond2 and cond3:
+        last7 = df.tail(7)
 
-            strength = abs(c1["CLOSE"] - c3["CLOSE"])
-            level = "STRONG" if strength > (0.02 * c3["CLOSE"]) else "NORMAL"
+        today = last7.iloc[-1]
+        prev6 = last7.iloc[:-1]
+
+        # =====================================================
+        # CONDITIONS
+        # =====================================================
+        is_nr7 = today["RANGE"] < prev6["RANGE"].min()
+        trend = today["CLOSE"] > today["MA20"]
+        vol_contract = today["TOTTRDQTY"] < today["VOL_AVG"]
+
+        if is_nr7 and vol_contract:
+
+            compression = today["RANGE"] / prev6["RANGE"].mean()
+            strength = "STRONG" if compression < 0.6 else "NORMAL"
+            direction = "UP" if trend else "DOWN"
 
             results.append({
                 "Symbol": sym,
-                "Date": c3["DATE"].strftime("%Y-%m-%d"),
-                "Close": round(c3["CLOSE"], 2),
-                "StrengthPts": round(strength, 2),
-                "Strength": level
+                "Date": today["DATE"].strftime("%Y-%m-%d"),
+                "Close": round(today["CLOSE"], 2),
+                "Compression": round(compression, 2),
+                "Direction": direction,
+                "Strength": strength
             })
 
     except:
@@ -121,17 +121,17 @@ if all_dates:
 else:
     final_date = datetime.now().strftime("%Y-%m-%d")
 
-OUT_FILE = OUT_DIR / f"fno_evening_star_{final_date}.csv"
+OUT_FILE = OUT_DIR / f"fno_nr7_filtered_{final_date}.csv"
 
 console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
 
 # =====================================================
 # SUMMARY
 # =====================================================
-console.rule("[bold red]EVENING STAR SUMMARY[/bold red]")
+console.rule("[bold magenta]NR7 SUMMARY[/bold magenta]")
 
 console.print(f"[cyan]📊 Total Checked:[/cyan] {checked}")
-console.print(f"[red]🔥 Signals Found:[/red] {len(results)}")
+console.print(f"[magenta]🔥 Signals Found:[/magenta] {len(results)}")
 
 # =====================================================
 # OUTPUT
@@ -140,44 +140,50 @@ df_out = pd.DataFrame(results)
 
 if not df_out.empty:
 
-    df_out = df_out.sort_values("StrengthPts", ascending=False)
+    df_out = df_out.sort_values("Compression")
 
-    table = Table(title="🌇 EVENING STAR (TOP REVERSAL)")
+    table = Table(title="🟣 NR7 (VOLATILITY COMPRESSION)")
 
     table.add_column("Symbol", justify="center")
     table.add_column("Date", justify="center")
     table.add_column("Close", justify="center")
-    table.add_column("StrengthPts", justify="center")
+    table.add_column("Compression", justify="center")
+    table.add_column("Dir", justify="center")
     table.add_column("Strength", justify="center")
 
-    for _, row in df_out.head(10).iterrows():
+    for _, row in df_out.head(15).iterrows():
 
-        color = "red" if row["Strength"] == "STRONG" else "white"
+        color = "green" if row["Direction"] == "UP" else "red"
 
         table.add_row(
             f"[{color}]{row['Symbol']}[/{color}]",
             row["Date"],
             str(row["Close"]),
-            str(row["StrengthPts"]),
+            str(row["Compression"]),
+            row["Direction"],
             row["Strength"]
         )
 
     console.print(table)
 
     df_out.to_csv(OUT_FILE, index=False)
-    console.print(f"\n[bold red]✔ Saved → {OUT_FILE}[/bold red]")
+    console.print(f"\n[bold magenta]✔ Saved → {OUT_FILE}[/bold magenta]")
 
-    console.rule("[bold red]ACTION LIST[/bold red]")
+    console.rule("[bold magenta]ACTION LIST[/bold magenta]")
 
-    console.print("\n[red]🔴 Reversal Short Candidates[/red]")
-    for s in df_out["Symbol"].head(5):
+    console.print("\n[green]🟢 Breakout Candidates[/green]")
+    for s in df_out[df_out["Direction"]=="UP"]["Symbol"].head(5):
+        console.print(f"  → {s}")
+
+    console.print("\n[red]🔴 Breakdown Candidates[/red]")
+    for s in df_out[df_out["Direction"]=="DOWN"]["Symbol"].head(5):
         console.print(f"  → {s}")
 
 else:
-    console.print("\n[yellow]⚠ No Evening Star Found[/yellow]")
+    console.print("\n[yellow]⚠ No NR7 Found[/yellow]")
 
 # =====================================================
 # FINAL NOTE
 # =====================================================
 console.rule("[bold yellow]NOTE[/bold yellow]")
-console.print("👉 Evening Star = top exhaustion → possible reversal down")
+console.print("👉 NR7 = lowest volatility → big move coming")
