@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-MASTER ENGINE (FINAL VERSION - ADX FIXED)
+MASTER ENGINE (PRO FINAL VERSION)
 
-✔ Uses ADX 'Signal' column correctly
-✔ Handles Symbol/SYMBOL mismatch
+✔ Smart Money fix (RANK / RANK_SCORE handled)
+✔ ADX signal mapping fixed
 ✔ Robust merging
-✔ Produces accurate FINAL_SCORE
+✔ Clean scoring system
+✔ Production ready
 
 Author: Harshal System 🚀
 """
@@ -68,11 +69,22 @@ def load_all():
 # SCORING
 # =========================================================
 def score_smart_money(df):
-    if df.empty or 'RANK_SCORE' not in df.columns:
+    if df.empty:
         return pd.DataFrame(columns=['SYMBOL','SM_SCORE'])
 
-    df['SM_SCORE'] = df['RANK_SCORE']
+    df.columns = df.columns.str.upper()
+
+    # 🔥 FIX: support both formats
+    if 'RANK_SCORE' in df.columns:
+        df['SM_SCORE'] = df['RANK_SCORE']
+    elif 'RANK' in df.columns:
+        df['SM_SCORE'] = df['RANK']
+    else:
+        print("⚠ Smart Money column missing")
+        return pd.DataFrame(columns=['SYMBOL','SM_SCORE'])
+
     return df[['SYMBOL','SM_SCORE']]
+
 
 def score_pcr(df):
     if df.empty or 'PCR' not in df.columns:
@@ -89,7 +101,7 @@ def score_pcr(df):
     df['PCR_SCORE'] = df['PCR'].apply(logic)
     return df[['SYMBOL','PCR_SCORE']]
 
-# 🔥 FIXED ADX FUNCTION
+
 def score_adx(df):
     if df.empty:
         return pd.DataFrame(columns=['SYMBOL','ADX_SCORE'])
@@ -102,8 +114,8 @@ def score_adx(df):
             if col.lower() == 'symbol':
                 df.rename(columns={col: 'SYMBOL'}, inplace=True)
 
-    # Use SIGNAL column (from your ADX script)
     if 'SIGNAL' not in df.columns:
+        print("⚠ ADX SIGNAL missing")
         return pd.DataFrame(columns=['SYMBOL','ADX_SCORE'])
 
     def logic(x):
@@ -117,6 +129,7 @@ def score_adx(df):
     df['ADX_SCORE'] = df['SIGNAL'].apply(logic)
 
     return df[['SYMBOL','ADX_SCORE']]
+
 
 def score_candles(engulf, inside):
     frames = []
@@ -170,7 +183,9 @@ def build_master():
     # Confidence
     df['CONFIDENCE'] = (abs(df['FINAL_SCORE']) * 100).round(2)
 
-    # Sort
+    # =====================================================
+    # SORTING
+    # =====================================================
     df = df.sort_values(by='FINAL_SCORE', ascending=False)
 
     return df
@@ -189,12 +204,14 @@ def save(df):
 # MAIN
 # =========================================================
 def main():
-    print("🧠 MASTER ENGINE (ADX FIXED) STARTED")
+    print("🧠 MASTER ENGINE (PRO FINAL) STARTED")
 
     df = build_master()
 
     print("\n🎯 TOP TRADES")
-    print(df.head(10)[['SYMBOL','DIRECTION','FINAL_SCORE','CONFIDENCE']])
+    print(df.head(10)[[
+        'SYMBOL','DIRECTION','FINAL_SCORE','CONFIDENCE'
+    ]])
 
     save(df)
 

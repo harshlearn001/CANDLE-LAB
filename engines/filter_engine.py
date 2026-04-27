@@ -75,6 +75,17 @@ def apply_filter(master, inside, engulf):
             return pd.DataFrame()
 
     # =====================================================
+    # 🧠 PASS COUNT LOGIC (CORE FIX)
+    # =====================================================
+    conditions = [
+        df['SM_SCORE'] > 0.7,
+        df['FINAL_SCORE'] > 0.4,
+        df['ADX_SCORE'] > 0.3
+    ]
+
+    df['PASS_COUNT'] = sum(conditions)
+
+    # =====================================================
     # 🟢 TIER 1: ELITE
     # =====================================================
     elite = df[
@@ -82,6 +93,60 @@ def apply_filter(master, inside, engulf):
         (df['FINAL_SCORE'] > 0.55)
     ]
 
+    # =====================================================
+    # 🟡 TIER 2: STRONG
+    # =====================================================
+    strong = df[
+        (df['PASS_COUNT'] >= 2)
+    ]
+
+    # =====================================================
+    # 🧩 FALLBACK (VERY IMPORTANT)
+    # =====================================================
+    if elite.empty and strong.empty:
+        print("⚠ No strict matches → using fallback")
+
+        strong = df[
+            (df['SM_SCORE'] > 0.6)
+        ]
+
+    # Combine
+    df = pd.concat([elite, strong]).drop_duplicates()
+
+    # =====================================================
+    # 🔥 CANDLE CONFIRMATION (NOT FILTER)
+    # =====================================================
+    valid_symbols = set()
+
+    if not inside.empty and 'SYMBOL' in inside.columns:
+        valid_symbols.update(inside['SYMBOL'].unique())
+
+    if not engulf.empty and 'SYMBOL' in engulf.columns:
+        valid_symbols.update(engulf['SYMBOL'].unique())
+
+    df['CANDLE_CONFIRM'] = df['SYMBOL'].isin(valid_symbols)
+
+    # =====================================================
+    # 🧠 FINAL SCORE BOOST (SMART RANKING)
+    # =====================================================
+    df['FINAL_RANK_SCORE'] = (
+        df['FINAL_SCORE'] * 0.5 +
+        df['SM_SCORE'] * 0.3 +
+        df['ADX_SCORE'] * 0.2
+    )
+
+    # Boost if candle confirmation
+    df.loc[df['CANDLE_CONFIRM'] == True, 'FINAL_RANK_SCORE'] += 0.1
+
+    # =====================================================
+    # SORT
+    # =====================================================
+    df = df.sort_values(
+        by=['FINAL_RANK_SCORE'],
+        ascending=False
+    )
+
+    return df
     # =====================================================
     # 🟡 TIER 2: STRONG
     # =====================================================
