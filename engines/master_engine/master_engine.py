@@ -1,222 +1,94 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-MASTER ENGINE (PRO FINAL VERSION)
-
-✔ Smart Money fix (RANK / RANK_SCORE handled)
-✔ ADX signal mapping fixed
-✔ Robust merging
-✔ Clean scoring system
-✔ Production ready
-
-Author: Harshal System 🚀
-"""
-
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
 
-# =========================================================
-# PATHS
-# =========================================================
 BASE_PATH = Path(r"H:\CANDLE-LAB\analysis\equity\signals")
 
-SMART_MONEY_PATH = BASE_PATH / "smart_money"
-PCR_PATH = BASE_PATH / "options_pcr"
-ADX_PATH = BASE_PATH / "adx"
+SMART = BASE_PATH / "smart_money"
+PCR = BASE_PATH / "options_pcr"
+ADX = BASE_PATH / "adx"
+MARU = BASE_PATH / "marubozu_latest"
+OHL = BASE_PATH / "open_high_low"
 
-ENGULF_PATH = BASE_PATH / "engulfing"
-INSIDE_PATH = BASE_PATH / "inside_bar"
+OUTPUT = Path(r"H:\CANDLE-LAB\analysis\equity\master")
+OUTPUT.mkdir(parents=True, exist_ok=True)
 
-OUTPUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\master")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def load_latest(p):
+    f = sorted(p.glob("*.csv"))
+    return pd.read_csv(f[-1]) if f else pd.DataFrame()
 
-# =========================================================
-# HELPERS
-# =========================================================
-def load_latest(folder):
-    files = sorted(folder.glob("*.csv"))
-    if not files:
-        return pd.DataFrame()
-    return pd.read_csv(files[-1])
-
-def normalize(df):
-    if df.empty:
-        return df
-
-    df.columns = df.columns.str.upper().str.strip()
-
-    for col in df.columns:
-        if col.lower() == "symbol":
-            df.rename(columns={col: "SYMBOL"}, inplace=True)
-
+def norm(df):
+    if df.empty: return df
+    df.columns = df.columns.str.upper()
+    if 'SYMBOL' not in df.columns:
+        df.rename(columns={df.columns[0]:'SYMBOL'}, inplace=True)
     return df
 
-# =========================================================
-# LOAD DATA
-# =========================================================
-def load_all():
-    smart = normalize(load_latest(SMART_MONEY_PATH))
-    pcr = normalize(load_latest(PCR_PATH))
-    adx = normalize(load_latest(ADX_PATH))
-    engulf = normalize(load_latest(ENGULF_PATH))
-    inside = normalize(load_latest(INSIDE_PATH))
+def build():
 
-    return smart, pcr, adx, engulf, inside
+    sm = norm(load_latest(SMART))
+    pcr = norm(load_latest(PCR))
+    adx = norm(load_latest(ADX))
+    maru = norm(load_latest(MARU))
+    ohl = norm(load_latest(OHL))
 
-# =========================================================
-# SCORING
-# =========================================================
-def score_smart_money(df):
-    if df.empty:
-        return pd.DataFrame(columns=['SYMBOL','SM_SCORE'])
+    df = sm[['SYMBOL','SM_SCORE']].copy()
 
-    df.columns = df.columns.str.upper()
+    # PCR
+    if 'PCR' in pcr.columns:
+        pcr['PCR_SCORE'] = pcr['PCR'].apply(lambda x: 1 if x<0.5 else -1 if x>1 else 0)
+        df = df.merge(pcr[['SYMBOL','PCR_SCORE']], on='SYMBOL', how='left')
 
-    # 🔥 FIX: support both formats
-    if 'RANK_SCORE' in df.columns:
-        df['SM_SCORE'] = df['RANK_SCORE']
-    elif 'RANK' in df.columns:
-        df['SM_SCORE'] = df['RANK']
-    else:
-        print("⚠ Smart Money column missing")
-        return pd.DataFrame(columns=['SYMBOL','SM_SCORE'])
+    # ADX
+    if 'SIGNAL' in adx.columns:
+        adx['ADX_SCORE'] = adx['SIGNAL'].map({'UPTREND':1,'DOWNTREND':-1}).fillna(0)
+        df = df.merge(adx[['SYMBOL','ADX_SCORE']], on='SYMBOL', how='left')
 
-    return df[['SYMBOL','SM_SCORE']]
+    # MARUBOZU
+    if 'TYPE' in maru.columns:
+        maru['MARU_SCORE'] = maru['TYPE'].map({'BULLISH':1,'BEARISH':-1})
+        df = df.merge(maru[['SYMBOL','MARU_SCORE']], on='SYMBOL', how='left')
 
-
-def score_pcr(df):
-    if df.empty or 'PCR' not in df.columns:
-        return pd.DataFrame(columns=['SYMBOL','PCR_SCORE'])
-
-    def logic(x):
-        if x < 0.5:
-            return 1
-        elif x > 1:
-            return -1
-        else:
-            return 0
-
-    df['PCR_SCORE'] = df['PCR'].apply(logic)
-    return df[['SYMBOL','PCR_SCORE']]
-
-
-def score_adx(df):
-    if df.empty:
-        return pd.DataFrame(columns=['SYMBOL','ADX_SCORE'])
-
-    df.columns = df.columns.str.upper()
-
-    # Fix symbol column
-    if 'SYMBOL' not in df.columns:
-        for col in df.columns:
-            if col.lower() == 'symbol':
-                df.rename(columns={col: 'SYMBOL'}, inplace=True)
-
-    if 'SIGNAL' not in df.columns:
-        print("⚠ ADX SIGNAL missing")
-        return pd.DataFrame(columns=['SYMBOL','ADX_SCORE'])
-
-    def logic(x):
-        if x == 'UPTREND':
-            return 1
-        elif x == 'DOWNTREND':
-            return -1
-        else:
-            return 0
-
-    df['ADX_SCORE'] = df['SIGNAL'].apply(logic)
-
-    return df[['SYMBOL','ADX_SCORE']]
-
-
-def score_candles(engulf, inside):
-    frames = []
-
-    if not engulf.empty and 'SYMBOL' in engulf.columns:
-        engulf['CANDLE_SCORE'] = 1
-        frames.append(engulf[['SYMBOL','CANDLE_SCORE']])
-
-    if not inside.empty and 'SYMBOL' in inside.columns:
-        inside['CANDLE_SCORE'] = 0.5
-        frames.append(inside[['SYMBOL','CANDLE_SCORE']])
-
-    if not frames:
-        return pd.DataFrame(columns=['SYMBOL','CANDLE_SCORE'])
-
-    df = pd.concat(frames)
-    return df.groupby('SYMBOL').sum().reset_index()
-
-# =========================================================
-# MASTER BUILD
-# =========================================================
-def build_master():
-    smart, pcr, adx, engulf, inside = load_all()
-
-    sm = score_smart_money(smart)
-    pc = score_pcr(pcr)
-    ax = score_adx(adx)
-    cd = score_candles(engulf, inside)
-
-    df = sm.merge(pc, on='SYMBOL', how='outer') \
-           .merge(ax, on='SYMBOL', how='outer') \
-           .merge(cd, on='SYMBOL', how='outer')
+    # OPEN HL
+    if 'TYPE' in ohl.columns:
+        ohl['OHL_SCORE'] = ohl['TYPE'].apply(lambda x: 1 if 'LOW' in x else -1)
+        df = df.merge(ohl[['SYMBOL','OHL_SCORE']], on='SYMBOL', how='left')
 
     df = df.fillna(0)
 
-    # =====================================================
     # FINAL SCORE
-    # =====================================================
     df['FINAL_SCORE'] = (
-        df['SM_SCORE'] * 0.4 +
-        df['PCR_SCORE'] * 0.2 +
-        df['ADX_SCORE'] * 0.2 +
-        df['CANDLE_SCORE'] * 0.2
+        df['SM_SCORE']*0.35 +
+        df['PCR_SCORE']*0.25 +
+        df['ADX_SCORE']*0.15 +
+        df['MARU_SCORE']*0.15 +
+        df['OHL_SCORE']*0.10
     )
 
-    # Direction
-    df['DIRECTION'] = df['FINAL_SCORE'].apply(
-        lambda x: 'LONG' if x > 0 else 'SHORT'
-    )
+    # DIRECTION (IMPROVED)
+    def direction(x):
+        if x > 0.3: return "LONG"
+        elif x < -0.3: return "SHORT"
+        else: return "SIDEWAYS"
 
-    # Confidence
-    df['CONFIDENCE'] = (abs(df['FINAL_SCORE']) * 100).round(2)
+    df['DIRECTION'] = df['FINAL_SCORE'].apply(direction)
 
-    # =====================================================
-    # SORTING
-    # =====================================================
+    df['CONFIDENCE'] = (abs(df['FINAL_SCORE'])*100).round(2)
+
     df = df.sort_values(by='FINAL_SCORE', ascending=False)
 
     return df
 
-# =========================================================
-# SAVE
-# =========================================================
 def save(df):
-    today = datetime.now().strftime("%Y-%m-%d")
-    path = OUTPUT_DIR / f"master_trades_{today}.csv"
+    f = OUTPUT / f"master_trades_{datetime.now().strftime('%Y-%m-%d')}.csv"
+    df.to_csv(f,index=False)
+    print("Saved →",f)
 
-    df.to_csv(path, index=False)
-    print(f"\n✔ Saved → {path}")
-
-# =========================================================
-# MAIN
-# =========================================================
-def main():
-    print("🧠 MASTER ENGINE (PRO FINAL) STARTED")
-
-    df = build_master()
-
-    print("\n🎯 TOP TRADES")
-    print(df.head(10)[[
-        'SYMBOL','DIRECTION','FINAL_SCORE','CONFIDENCE'
-    ]])
-
-    save(df)
-
-    print("\n🚀 MASTER ENGINE COMPLETED")
-
-# =========================================================
 if __name__ == "__main__":
-    main()
+    print("MASTER ENGINE V2 RUNNING")
+    df = build()
+    print(df.head(10))
+    save(df)

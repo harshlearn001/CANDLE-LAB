@@ -1,21 +1,11 @@
 # ===============================
-# GENERATED ANALYSIS FILES
+# GENERATED DATA (DO NOT TRACK)
 # ===============================
-analysis/**/*.csv
-
-# KEEP STRUCTURE
-!analysis/
-!analysis/equity/
-!analysis/equity/signals/
-!analysis/equity/last_row/
-
-# ===============================
-# LOGS
-# ===============================
+analysis/
 logs/
 
 # ===============================
-# CONFIG (OPTIONAL IGNORE)
+# OPTIONAL CONFIG (UNCOMMENT IF AUTO-GENERATED)
 # ===============================
 # config/fno_symbols.csv
 
@@ -39,7 +29,13 @@ __pycache__/
 Thumbs.db
 
 # ===============================
-# IDE
+# IDE / EDITOR
 # ===============================
 .vscode/
 .idea/
+
+# ===============================
+# ENV / VIRTUAL ENV (OPTIONAL)
+# ===============================
+venv/
+.env

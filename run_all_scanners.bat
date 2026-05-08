@@ -2,185 +2,171 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
+REM ======================================
+REM FORCE AUTO MODE DEFAULT
+REM ======================================
+if "%AUTO_MODE%"=="" set AUTO_MODE=1
+
+REM ======================================
+REM PAUSE CONTROL (SAFE)
+REM ======================================
+if "%AUTO_MODE%"=="1" (
+    set PAUSE_CMD=timeout /t 3 >nul
+) else (
+    set PAUSE_CMD=pause
+)
+
+REM ======================================
+REM PYTHON PATH
+REM ======================================
+set PYTHON=C:\Users\Harshal\anaconda3\python.exe
+
 echo ======================================
 echo   CANDLE-LAB MASTER PIPELINE STARTED
 echo ======================================
 
-set start=%time%
+echo Running from: %cd%
+echo Python: %PYTHON%
 
-REM ======================================
-REM ACTIVATE PYTHON (OPTIONAL IF NEEDED)
-REM ======================================
-call C:\Users\Harshal\anaconda3\Scripts\activate.bat base
+set start=%time%
 
 REM ======================================
 REM SETUP
 REM ======================================
-echo.
-echo [SETUP]
 cd /d H:\CANDLE-LAB\scanners\setup
-python 00_build_fno_symbol_list.py
-python 01_extract_last_row_equity.py
+if not exist 00_build_fno_symbol_list.py goto :error
+%PYTHON% 00_build_fno_symbol_list.py || goto :error
+
+if not exist 01_extract_last_row_equity.py goto :error
+%PYTHON% 01_extract_last_row_equity.py || goto :error
 
 REM ======================================
-REM PCR ENGINE
+REM CORE SCANNERS (ALPHABETICAL ORDER)
 REM ======================================
-echo.
-echo [PCR ENGINE]
-cd /d H:\CANDLE-LAB\scanners\pcr_options
-python 01_pcr_engine.py
-
-REM ======================================
-REM ADX
-REM ======================================
-echo.
-echo [ADX]
-cd /d H:\CANDLE-LAB\scanners\adx
-python 01_adx_scan.py
-
-REM ======================================
-REM ENGULFING
-REM ======================================
-echo.
-echo [ENGULFING]
-cd /d H:\CANDLE-LAB\scanners\engulfing_candle
-python 01_bullish_engulfing.py
-python 02_bearish_engulfing.py
-
-REM ======================================
-REM VOLUME
-REM ======================================
-echo.
-echo [VOLUME GREEN]
-cd /d H:\CANDLE-LAB\scanners\green_candle_fourday
-python 01_4day_green_priceup_volume_rising.py
 
 echo.
-echo [VOLUME RED]
-cd /d H:\CANDLE-LAB\scanners\red_candle_fourday
-python 01_4day_red_priceup_volume_rising.py
+echo ==============================
+echo   RUNNING SCANNERS (A → Z)
+echo ==============================
+echo Total scanners running...
+cd /d H:\CANDLE-LAB\scanners
 
-REM ======================================
-REM CANDLE PATTERNS
-REM ======================================
-echo.
-echo [GRAVESTONE]
-cd /d H:\CANDLE-LAB\scanners\gravestone_candle
-python 01_gravestone_doji_in_uptrend.py
+REM ===== A =====
+cd adx
+%PYTHON% 01_adx_scan.py || goto :error
 
-echo.
-echo [HAMMER]
-cd /d H:\CANDLE-LAB\scanners\hammer
-python hammer_confirmation.py
+REM ===== B =====
+cd ..\breadth
+%PYTHON% 01_breadth_scan.py || goto :error
 
-echo.
-echo [SHOOTING STAR]
-cd /d H:\CANDLE-LAB\scanners\shooting_star
-python 01_shooting_star_uptrend.py
+REM ===== D =====
+cd ..\doji
+%PYTHON% 01_doji_scan.py || goto :error
 
-echo.
-echo [HANGING MAN]
-cd /d H:\CANDLE-LAB\scanners\hangingman
-python 01_hanging_man_scan.py
+REM ===== E =====
+cd ..\engulfing_candle
+%PYTHON% 01_bullish_engulfing.py || goto :error
+%PYTHON% 02_bearish_engulfing.py || goto :error
 
-echo.
-echo [HARAMI]
-cd /d H:\CANDLE-LAB\scanners\harami
-python 01_harami_scan.py
+REM ===== G =====
+cd ..\gravestone_candle
+%PYTHON% 01_gravestone_doji_in_uptrend.py || goto :error
 
-echo.
-echo [INSIDE BAR]
-cd /d H:\CANDLE-LAB\scanners\inside_bar
-python inside_bar_scan.py
+cd ..\gravestone_candle_stick
+%PYTHON% 01_gravestone_candle_stick.py || goto :error
 
-echo.
-echo [NR7]
-cd /d H:\CANDLE-LAB\scanners\nr7
-python nr7_scan.py
+cd ..\green_candle_fourday
+%PYTHON% 01_4day_green_priceup_volume_rising.py || goto :error
 
-echo.
-echo [VWAP]
-cd /d H:\CANDLE-LAB\scanners\vwap
-python 01_vwap_scan.py
+REM ===== H =====
+cd ..\hammer
+%PYTHON% hammer_confirmation.py || goto :error
 
-echo.
-echo [DOJI]
-cd /d H:\CANDLE-LAB\scanners\doji
-python 01_doji_scan.py
+cd ..\hangingman
+%PYTHON% 01_hanging_man_scan.py || goto :error
 
-echo.
-echo [LONG LEG DOJI]
-cd /d H:\CANDLE-LAB\scanners\long_leg_doji
-python 01_long_leg_doji.py
+cd ..\harami
+%PYTHON% 01_harami_scan.py || goto :error
 
-echo.
-echo [VOLUME SCAN]
-cd /d H:\CANDLE-LAB\scanners\volume
-python 01_volume_scan.py
+REM ===== I =====
+cd ..\inside_bar
+%PYTHON% inside_bar_scan.py || goto :error
 
-REM ======================================
-REM MOMENTUM
-REM ======================================
-echo.
-echo [RSI]
-cd /d H:\CANDLE-LAB\scanners\rsi
-python 01_rsi_scan.py
+REM ===== L =====
+cd ..\long_leg_doji
+%PYTHON% 01_long_leg_doji.py || goto :error
 
-echo.
-echo [RSI DIVERGENCE]
-cd /d H:\CANDLE-LAB\scanners\rsi_divergence
-python 02_rsi_divergence_scan.py
+REM ===== M =====
+cd ..\marubozu
+%PYTHON% 01_marubozu_bullish_bearish.py || goto :error
+
+cd ..\marubozu_tolerance_scaner
+%PYTHON% 01_marubozu_tolerance_scaner.py || goto :error
+
+cd ..\morning_evening_star
+%PYTHON% 01_morning_star_scanner.py || goto :error
+%PYTHON% 02_evening_star_scanner.py || goto :error
+
+REM ===== N =====
+cd ..\nr7
+%PYTHON% nr7_scan.py || goto :error
+
+REM ===== O =====
+cd ..\open_high_low
+%PYTHON% 01_open_high_low_scanner.py || goto :error
+
+REM ===== P =====
+cd ..\pcr_options
+%PYTHON% 01_pcr_engine.py || goto :error
+
+REM ===== R =====
+cd ..\red_candle_fourday
+%PYTHON% 01_4day_red_priceup_volume_rising.py || goto :error
+
+cd ..\rsi
+%PYTHON% 01_rsi_scan.py || goto :error
+
+cd ..\rsi_divergence
+%PYTHON% 02_rsi_divergence_scan.py || goto :error
+
+REM ===== S =====
+cd ..\shooting_star
+%PYTHON% 01_shooting_star_uptrend.py || goto :error
+
+REM ===== V =====
+cd ..\volume
+%PYTHON% 01_volume_scan.py || goto :error
+
+cd ..\vwap
+%PYTHON% 01_vwap_scan.py || goto :error
 
 REM ======================================
-REM MORNING / EVENING
+REM ENGINES
 REM ======================================
-echo.
-echo [MORNING STAR]
-cd /d H:\CANDLE-LAB\scanners\morning_evening_star
-python 01_morning_star_scanner.py
 
-echo.
-echo [EVENING STAR]
-python 02_evening_star_scanner.py
-
-REM ======================================
-REM 🔥 SMART MONEY ENGINE
-REM ======================================
-echo.
-echo [SMART MONEY ENGINE]
 cd /d H:\CANDLE-LAB\engines\smart_money_engine
-python smart_money_engine.py || goto :error
+%PYTHON% smart_money_engine.py || goto :error
 
-REM ======================================
-REM MASTER ENGINE
-REM ======================================
-echo.
-echo [MASTER ENGINE]
 cd /d H:\CANDLE-LAB\engines\master_engine
-python master_engine.py || goto :error
+%PYTHON% master_engine.py || goto :error
 
-REM ======================================
-REM FILTER ENGINE
-REM ======================================
-echo.
-echo [FILTER ENGINE]
 cd /d H:\CANDLE-LAB\engines
-echo Running from: %cd%
-python filter_engine.py || goto :error
+%PYTHON% filter_engine.py || goto :error
 
 REM ======================================
 REM END
 REM ======================================
+
 echo.
 echo ======================================
-echo   FULL PIPELINE COMPLETED ✅
+echo   FULL PIPELINE COMPLETED
 echo ======================================
 
 set end=%time%
 echo Started at: %start%
 echo Ended at  : %end%
 
-pause
+%PAUSE_CMD%
 exit /b 0
 
 REM ======================================
@@ -188,7 +174,8 @@ REM ERROR HANDLER
 REM ======================================
 :error
 echo.
-echo ❌ PIPELINE FAILED
-echo Check above step for error
-pause
+echo ERROR: PIPELINE FAILED
+echo Check above step
+
+%PAUSE_CMD%
 exit /b 1
