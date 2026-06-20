@@ -17,10 +17,16 @@ __pycache__/
 *.pyo
 
 # ===============================
+# LINTER CACHE
+# ===============================
+.ruff_cache/
+
+# ===============================
 # TEMP FILES
 # ===============================
 *.log
 *.tmp
+lint_report.txt
 
 # ===============================
 # OS FILES
@@ -35,8 +41,13 @@ Thumbs.db
 .idea/
 
 # ===============================
-# ENV / VIRTUAL ENV (OPTIONAL)
+# ENV / VIRTUAL ENV
 # ===============================
 venv/
 .env
-lint_report.txt
+
+# ===============================
+# FUTURE DATA FORMATS (SAFE)
+# ===============================
+*.parquet
+*.feather
