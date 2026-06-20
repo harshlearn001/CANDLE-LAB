@@ -66,11 +66,11 @@ cd ..\doji
 %PYTHON% 01_doji_scan.py || goto :error
 
 REM ===== E =====
-cd ..\price_action
+cd ..\engulfing_candle
 %PYTHON% 01_bullish_engulfing.py || goto :error
 %PYTHON% 02_bearish_engulfing.py || goto :error
 
-cd ..\multi_factor
+cd ..\engulfing_candle_advanced_rsidivergence
 %PYTHON% engulfing_advanced.py || goto :error
 
 REM ===== G =====
