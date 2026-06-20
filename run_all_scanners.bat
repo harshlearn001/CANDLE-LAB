@@ -158,6 +158,9 @@ cd /d H:\CANDLE-LAB\engines\master_engine
 cd /d H:\CANDLE-LAB\engines
 %PYTHON% filter_engine.py || goto :error
 
+cd /d H:\CANDLE-LAB\engines
+%PYTHON% consolidation_engine.py || goto :error
+
 REM ======================================
 REM END
 REM ======================================

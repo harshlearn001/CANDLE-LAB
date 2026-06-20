@@ -48,14 +48,36 @@ Modular signal generators based on different market behaviors:
 
 ---
 
-### 3. Analysis Layer (`analysis/`)
+### 3. Analysis Layer (`analysis/equity/`)
 
 * `last_row/` → processed base datasets
-* `signals/` → scanner outputs (daily signals)
+* `signals/` → individual scanner outputs (daily signals by pattern type)
+* `master/` → unified master_trades with all scoring metrics
+* `filtered/` → high-quality filtered_trades (ADX + candle confirmation)
+* `consolidated/` → **NEW** unified ranked output combining filtered + master trades
 
 ---
 
-### 4. Execution Pipeline
+### 4. Ranking & Consolidation Engine (`engines/consolidation_engine.py`)
+
+**Purpose**: Merge filtered and master trades into single prioritized output
+
+**Output Structure** (`consolidated_analysis_YYYY-MM-DD.csv`):
+- **RANK**: Opportunity ranking
+- **SYMBOL**: Stock symbol
+- **SOURCE**: FILTERED (priority 1) or MASTER (priority 2)
+- **FINAL_SCORE**: Composite score (0.0-1.0)
+- **DIRECTION**: LONG or SHORT bias
+- Additional metrics from source files
+
+**Priority Logic**:
+1. Filtered trades listed first (higher quality - ADX trending + candle confirmed)
+2. Master trades added after (broader coverage, lower barrier)
+3. Sorted by FINAL_SCORE descending within each tier
+
+---
+
+### 5. Execution Pipeline
 
 Run via:
 
@@ -66,8 +88,25 @@ run_all_scanners.bat
 Flow:
 
 ```text
-Setup → Scanners → Signal Files
+Setup 
+  ↓
+Scanners (30+ pattern engines) 
+  ↓
+Signal Files (individual pattern outputs)
+  ↓
+Smart Money Engine (scoring)
+  ↓
+Master Engine (unified trades)
+  ↓
+Filter Engine (ADX + candle confirmation)
+  ↓
+Consolidation Engine (FINAL RANKED OUTPUT)
 ```
+
+**Final Output Locations**:
+- ✅ **Primary**: `analysis/equity/consolidated/consolidated_analysis_YYYY-MM-DD.csv` (unified ranked)
+- `analysis/equity/filtered/filtered_trades_YYYY-MM-DD.csv` (high-quality only)
+- `analysis/equity/master/master_trades_YYYY-MM-DD.csv` (all opportunities)
 
 ---
 
