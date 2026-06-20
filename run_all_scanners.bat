@@ -64,12 +64,12 @@ cd ..\doji
 %PYTHON% 01_doji_scan.py || goto :error
 
 REM ===== E =====
-cd ..\engulfing_candle
+cd ..\price_action
 %PYTHON% 01_bullish_engulfing.py || goto :error
 %PYTHON% 02_bearish_engulfing.py || goto :error
 
-cd ..\engulfing_divergence_rsi_trend
-%PYTHON% engulfine_advaned.py || goto :error
+cd ..\multi_factor
+%PYTHON% engulfing_advanced.py || goto :error
 
 REM ===== G =====
 cd ..\gravestone_candle
@@ -129,7 +129,7 @@ cd ..\red_candle_fourday
 cd ..\rsi
 %PYTHON% 01_rsi_scan.py || goto :error
 
-cd ..\rsi_divergence
+cd ..\divergence
 %PYTHON% 02_rsi_divergence_scan.py || goto :error
 
 REM ===== S =====

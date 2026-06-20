@@ -193,10 +193,12 @@ if not df_out.empty:
         (df_out["Score"] >= 6) &
         (
             (
-                (df_out["Type"] == "SELL") &
-                (df_out["Trend"] == "UP") &
-                (df_out["RSI"] >= 65) &
-                ((df_out["Div"] == "YES") | (df_out["RSI"] >= 70))
+                (
+                    (df_out["Type"] == "SELL") &
+                    (df_out["Trend"] == "UP") &
+                    (df_out["RSI"] >= 65) &
+                    ((df_out["Div"] == "YES") | (df_out["RSI"] >= 70))
+                )
             )
             |
             (

@@ -30,7 +30,7 @@ Modular signal generators based on different market behaviors:
 
   * `Hammer/` → bottom reversal
   * `shooting_star/` → top rejection
-  * `grevystone_candle/` → exhaustion signals
+  * `gravestone_candle/` → exhaustion signals
 
 * **Structure / Compression**
 
@@ -44,7 +44,7 @@ Modular signal generators based on different market behaviors:
 
 * **Pattern Recognition**
 
-  * `engulfing_candle_1/` → strong directional candles
+  * `price_action/engulfing/` → strong directional candles (moved from `engulfing_candle`)
 
 ---
 

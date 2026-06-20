@@ -16,8 +16,8 @@ console = Console()
 # HEADER
 # =================================================
 console.print(Panel.fit(
-    "[bold green]BULLISH ENGULFING SCANNER[/bold green]\n[cyan]Pure Price Action Engine[/cyan]",
-    border_style="green"
+    "[bold red]BEARISH ENGULFING SCANNER[/bold red]\n[cyan]Pure Price Action Engine[/cyan]",
+    border_style="red"
 ))
 
 # =================================================
@@ -72,7 +72,7 @@ for symbol in symbols:
         if len(df) < 2:
             continue
 
-        # ✅ collect latest date
+        # ✅ collect date
         if not df.empty:
             all_dates.append(df["DATE"].max())
 
@@ -81,7 +81,7 @@ for symbol in symbols:
         prev = df.iloc[-2]
         curr = df.iloc[-1]
 
-        # BODY RATIO FUNCTION
+        # BODY SIZE
         def body_ratio(c):
             rng = c["HIGH"] - c["LOW"]
             if rng <= 0:
@@ -94,12 +94,12 @@ for symbol in symbols:
         if body_ratio(curr) < MIN_BODY_RATIO:
             continue
 
-        # ENGULFING CONDITION
+        # BEARISH ENGULFING
         if (
-            prev["CLOSE"] < prev["OPEN"] and
-            curr["CLOSE"] > curr["OPEN"] and
-            curr["OPEN"]  < prev["CLOSE"] and
-            curr["CLOSE"] > prev["OPEN"]
+            prev["CLOSE"] > prev["OPEN"] and
+            curr["CLOSE"] < curr["OPEN"] and
+            curr["OPEN"]  > prev["CLOSE"] and
+            curr["CLOSE"] < prev["OPEN"]
         ):
 
             body_size = abs(curr["CLOSE"] - curr["OPEN"])
@@ -124,7 +124,7 @@ if all_dates:
 else:
     final_date = datetime.now().strftime("%Y-%m-%d")
 
-OUT_FILE = OUT_DIR / f"bullish_engulfing_{final_date}.csv"
+OUT_FILE = OUT_DIR / f"bearish_engulfing_{final_date}.csv"
 
 console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
 
@@ -134,7 +134,7 @@ console.print(f"[yellow]📅 Data Date Used: {final_date}[/yellow]")
 console.rule("[bold cyan]ENGULFING SUMMARY[/bold cyan]")
 
 console.print(f"[cyan]📊 Total Checked:[/cyan] {checked}")
-console.print(f"[green]🔥 Signals Found:[/green] {len(results)}")
+console.print(f"[red]🔥 Signals Found:[/red] {len(results)}")
 
 # =================================================
 # OUTPUT
@@ -145,7 +145,7 @@ if not df_out.empty:
 
     df_out = df_out.sort_values("Date", ascending=False).reset_index(drop=True)
 
-    table = Table(title="🟢 BULLISH ENGULFING")
+    table = Table(title="🔴 BEARISH ENGULFING")
 
     table.add_column("Symbol", justify="center")
     table.add_column("Date", justify="center")
@@ -154,7 +154,7 @@ if not df_out.empty:
 
     for _, row in df_out.head(15).iterrows():
 
-        color = "green" if row["Strength"] == "STRONG" else "yellow"
+        color = "red" if row["Strength"] == "STRONG" else "yellow"
 
         table.add_row(
             f"[{color}]{row['Symbol']}[/{color}]",
@@ -166,16 +166,16 @@ if not df_out.empty:
     console.print(table)
 
     df_out.to_csv(OUT_FILE, index=False)
-    console.print(f"\n[bold green]✔ Saved → {OUT_FILE}[/bold green]")
+    console.print(f"\n[bold red]✔ Saved → {OUT_FILE}[/bold red]")
 
-    console.rule("[bold green]ACTION LIST[/bold green]")
+    console.rule("[bold red]ACTION LIST[/bold red]")
 
-    console.print("\n[green]🟢 Candidates[/green]")
+    console.print("\n[red]🔴 Short Candidates[/red]")
     for s in df_out["Symbol"].head(5):
         console.print(f"  → {s}")
 
 else:
-    console.print("\n[red]❌ No Bullish Engulfing Found[/red]")
+    console.print("\n[green]✔ No Bearish Engulfing Found[/green]")
 
 # =================================================
 # FINAL NOTE
