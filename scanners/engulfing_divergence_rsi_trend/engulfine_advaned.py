@@ -26,7 +26,7 @@ console.print(Panel.fit(
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\final_engine")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\Evening_star_advanced")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ================================
