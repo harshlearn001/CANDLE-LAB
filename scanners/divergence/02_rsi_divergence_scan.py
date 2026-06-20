@@ -13,7 +13,6 @@ CANDLE-LAB | RSI DIVERGENCE ENGINE (PRO)
 
 from pathlib import Path
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 # =====================================================

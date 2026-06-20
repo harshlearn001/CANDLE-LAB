@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from rich import print
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
 from pathlib import Path
 import pandas as pd
-from datetime import datetime
 
 console = Console()
 

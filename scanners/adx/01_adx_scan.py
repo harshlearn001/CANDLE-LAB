@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from rich import print
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 
 import pandas as pd
@@ -142,7 +140,7 @@ for symbol in symbols:
                 "Signal": signal
             })
 
-    except:
+    except Exception:
         continue
 
 # =====================================================
@@ -177,7 +175,7 @@ if total > 0:
     down_pct = (downtrend_count / total) * 100
     weak_pct = (weak_count / total) * 100
 
-    console.print(f"\n[bold]📊 Market Structure:[/bold]")
+    console.print("\n[bold]📊 Market Structure:[/bold]")
     console.print(f"[green]Uptrend: {up_pct:.1f}%[/green]")
     console.print(f"[red]Downtrend: {down_pct:.1f}%[/red]")
     console.print(f"[yellow]Weak: {weak_pct:.1f}%[/yellow]")

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from rich import print
 from rich.console import Console
 from rich.panel import Panel
 
@@ -85,7 +84,7 @@ for symbol in symbols:
         else:
             unchanged += 1
 
-    except:
+    except Exception:
         continue
 
 # =================================================
