@@ -24,7 +24,7 @@ console.print(Panel.fit(
 EQUITY_DIR = Path(r"H:\MarketForge\data\master\Equity_stock_master")
 FNO_FILE   = Path(r"H:\CANDLE-LAB\config\fno_symbols.csv")
 
-OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\Evening_star_advanced")
+OUT_DIR = Path(r"H:\CANDLE-LAB\analysis\equity\signals\Engulfing_advanced")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ================================
@@ -234,7 +234,7 @@ if not df_out.empty:
         console.print(table2)
 
     final_date = max(all_dates).strftime("%Y-%m-%d")
-    df_out.to_csv(OUT_DIR / f"final_signals_{final_date}.csv", index=False)
+    df_out.to_csv(OUT_DIR / f"engulfing_advanced_{final_date}.csv", index=False)
 
 else:
     console.print("[yellow]No signals found[/yellow]")
